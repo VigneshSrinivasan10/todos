@@ -19,6 +19,32 @@
     <script>
       window.global = window;
       window.process = window.process || { browser: true, env: {}, nextTick: function (f) { setTimeout(f, 0); } };
+
+      // Diagnostic: paint any error/unhandled-rejection directly into #root.
+      (function () {
+        function paint(label, detail) {
+          var el = document.getElementById('root');
+          if (!el) return;
+          var pre = document.createElement('pre');
+          pre.style.cssText = 'color:#ff6b6b;background:#1a1a1a;padding:16px;margin:16px;white-space:pre-wrap;font:12px ui-monospace,monospace;border:1px solid #ff6b6b;border-radius:6px';
+          pre.textContent = '[' + label + '] ' + detail;
+          el.appendChild(pre);
+        }
+        window.addEventListener('error', function (e) {
+          paint('error', (e.message || e.error || 'unknown') + '\nat ' + (e.filename || '?') + ':' + (e.lineno || '?') + ':' + (e.colno || '?') + (e.error && e.error.stack ? '\n' + e.error.stack : ''));
+        });
+        window.addEventListener('unhandledrejection', function (e) {
+          var r = e.reason || {};
+          paint('promise', (r.message || String(r)) + (r.stack ? '\n' + r.stack : ''));
+        });
+        // If React hasn't painted anything within 4s, say so.
+        setTimeout(function () {
+          var root = document.getElementById('root');
+          if (root && root.childNodes.length === 0) {
+            paint('idle', 'No JS error reported, but React never mounted within 4s. UA: ' + navigator.userAgent);
+          }
+        }, 4000);
+      })();
     </script>
     <title>todos</title>
   </head>
