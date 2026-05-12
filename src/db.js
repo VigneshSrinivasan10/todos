@@ -43,7 +43,7 @@ export function stopSync() {
 const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`);
 const now = () => new Date().toISOString();
 
-export async function createTask({ title, notes = '', tags = [], source = null, inbox = false, due = null }) {
+export async function createTask({ title, notes = '', tags = [], source = null, inbox = false, due = null, priority = false }) {
   const doc = {
     _id: `task:${uuid()}`,
     type: 'task',
@@ -51,6 +51,7 @@ export async function createTask({ title, notes = '', tags = [], source = null, 
     notes,
     done: false,
     inbox,
+    priority,
     deleted: false,
     tags,
     source,

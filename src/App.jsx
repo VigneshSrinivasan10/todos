@@ -13,7 +13,7 @@ import {
 } from './db.js';
 
 const VIEWS = [
-  { key: 'today', label: 'Today' },
+  { key: 'priority', label: 'Priority' },
   { key: 'inbox', label: 'Inbox' },
   { key: 'all', label: 'All' },
   { key: 'done', label: 'Done' },
@@ -21,7 +21,7 @@ const VIEWS = [
 ];
 
 export default function App() {
-  const [view, setView] = useState('today');
+  const [view, setView] = useState('priority');
   const [allTasks, setAllTasks] = useState([]);
   const [draft, setDraft] = useState('');
   const [query, setQuery] = useState('');
@@ -73,12 +73,7 @@ export default function App() {
   // ---- view derivation ------------------------------------------------------
 
   const counts = useMemo(() => {
-    const c = { today: 0, inbox: 0, all: 0, done: 0, trash: 0 };
-    const endOfToday = (() => {
-      const d = new Date();
-      d.setHours(23, 59, 59, 999);
-      return d.toISOString();
-    })();
+    const c = { priority: 0, inbox: 0, all: 0, done: 0, trash: 0 };
     for (const t of allTasks) {
       if (t.type !== 'task') continue;
       if (t.deleted) {
@@ -91,17 +86,12 @@ export default function App() {
       }
       c.all++;
       if (t.inbox) c.inbox++;
-      if (t.due && t.due <= endOfToday) c.today++;
+      if (t.priority) c.priority++;
     }
     return c;
   }, [allTasks]);
 
   const tasks = useMemo(() => {
-    const endOfToday = (() => {
-      const d = new Date();
-      d.setHours(23, 59, 59, 999);
-      return d.toISOString();
-    })();
     const q = query.trim().toLowerCase();
     const matches = (t) => {
       if (!q) return true;
@@ -117,13 +107,15 @@ export default function App() {
       if (view === 'done') return t.done;
       if (t.done) return false;
       if (view === 'inbox') return t.inbox;
-      if (view === 'today') return t.due && t.due <= endOfToday;
+      if (view === 'priority') return !!t.priority;
       return true;
     };
     const list = allTasks.filter((t) => filter(t) && matches(t));
     list.sort((a, b) => {
       if (view === 'trash') return (b.deletedAt || '').localeCompare(a.deletedAt || '');
       if (view === 'done') return (b.updated || '').localeCompare(a.updated || '');
+      // Priority-starred items float to the top in every list-style view.
+      if (!!b.priority !== !!a.priority) return b.priority ? 1 : -1;
       if (a.due && b.due) return a.due.localeCompare(b.due);
       if (a.due) return -1;
       if (b.due) return 1;
@@ -250,7 +242,15 @@ export default function App() {
       <ul className="list">
         {tasks.length === 0 && (
           <li className="empty">
-            {query ? 'no matches.' : isTrash ? 'trash is empty.' : isDone ? 'nothing done yet.' : 'nothing here.'}
+            {query
+              ? 'no matches.'
+              : isTrash
+              ? 'trash is empty.'
+              : isDone
+              ? 'nothing done yet.'
+              : view === 'priority'
+              ? 'star ★ tasks from Inbox or All to focus here.'
+              : 'nothing here.'}
           </li>
         )}
         {tasks.map((t) => (
@@ -299,25 +299,37 @@ function TaskRow({
   const isDone = view === 'done';
 
   return (
-    <li className={`item ${expanded ? 'item-expanded' : ''}`}>
+    <li className={`item ${expanded ? 'item-expanded' : ''} ${task.priority && !isTrash ? 'item-priority' : ''}`}>
       {!isTrash && (
         <button className="check" onClick={onToggle} aria-label="toggle done">
           {task.done ? '▣' : '▢'}
         </button>
       )}
       <div className="body">
-        {editing ? (
-          <EditField initial={task.title} onSave={onSaveEdit} onCancel={onCancelEdit} />
-        ) : (
-          <button
-            className={`title title-button ${task.done ? 'title-done' : ''}`}
-            onClick={isTrash ? undefined : onStartEdit}
-            disabled={isTrash}
-            title={isTrash ? '' : 'click to edit'}
-          >
-            {task.title}
-          </button>
-        )}
+        <div className="title-row">
+          {!isTrash && (
+            <button
+              className={`star ${task.priority ? 'star-on' : ''}`}
+              onClick={() => onPatch({ priority: !task.priority }, task.priority ? 'Unstarred' : 'Starred ★')}
+              aria-label={task.priority ? 'unstar' : 'star'}
+              title={task.priority ? 'unstar' : 'mark as priority'}
+            >
+              {task.priority ? '★' : '☆'}
+            </button>
+          )}
+          {editing ? (
+            <EditField initial={task.title} onSave={onSaveEdit} onCancel={onCancelEdit} />
+          ) : (
+            <button
+              className={`title title-button ${task.done ? 'title-done' : ''}`}
+              onClick={isTrash ? undefined : onStartEdit}
+              disabled={isTrash}
+              title={isTrash ? '' : 'click to edit'}
+            >
+              {task.title}
+            </button>
+          )}
+        </div>
         <div className="meta">
           {task.source && <span className="tag">⤴ {task.source}</span>}
           {task.due && <span className={`tag ${isOverdue(task.due) && !task.done ? 'tag-warn' : ''}`}>⏱ {fmtDue(task.due)}</span>}
