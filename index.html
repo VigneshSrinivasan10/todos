@@ -6,6 +6,7 @@
     <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#0e0e0c" media="(prefers-color-scheme: dark)" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="apple-touch-icon" href="/icon.svg" />
@@ -15,6 +16,10 @@
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
+    <script>
+      window.global = window;
+      window.process = window.process || { browser: true, env: {}, nextTick: function (f) { setTimeout(f, 0); } };
+    </script>
     <title>todos</title>
   </head>
   <body>
