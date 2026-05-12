@@ -5,7 +5,6 @@ PouchDB.plugin(PouchDBFind);
 
 export const db = new PouchDB('todos');
 
-// Indexes for the views — only do this once per app load.
 let indexed = false;
 export async function initDb() {
   if (indexed) return;
@@ -15,11 +14,6 @@ export async function initDb() {
 }
 
 // ---- Optional CouchDB sync ---------------------------------------------------
-// Configure via `.env.local`:
-//   VITE_COUCH_URL=http://ryzen.tailnet:5984/todos
-//   VITE_COUCH_USER=...
-//   VITE_COUCH_PASS=...
-// If VITE_COUCH_URL is empty, the app stays purely local-first.
 
 const remoteUrl = import.meta.env.VITE_COUCH_URL;
 let syncHandler = null;
@@ -49,12 +43,6 @@ export function stopSync() {
 const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`);
 const now = () => new Date().toISOString();
 
-/**
- * Task shape:
- *   { _id, _rev, type: 'task',
- *     title, notes, tags[], source, due,
- *     done, inbox, created, updated }
- */
 export async function createTask({ title, notes = '', tags = [], source = null, inbox = false, due = null }) {
   const doc = {
     _id: `task:${uuid()}`,
@@ -63,14 +51,15 @@ export async function createTask({ title, notes = '', tags = [], source = null, 
     notes,
     done: false,
     inbox,
+    deleted: false,
     tags,
     source,
     due,
     created: now(),
     updated: now()
   };
-  await db.put(doc);
-  return doc;
+  const res = await db.put(doc);
+  return { ...doc, _rev: res.rev };
 }
 
 export async function updateTask(task, patch) {
@@ -80,19 +69,24 @@ export async function updateTask(task, patch) {
 }
 
 export async function deleteTask(task) {
+  return updateTask(task, { deleted: true, deletedAt: now() });
+}
+
+export async function restoreTask(task) {
+  return updateTask(task, { deleted: false, deletedAt: null });
+}
+
+export async function purgeTask(task) {
   return db.remove(task);
 }
 
-/** Fetch tasks for a named view: 'today' | 'inbox' | 'all'. */
-export async function getTasks(view) {
-  const selector = { type: 'task', done: false };
-  if (view === 'inbox') {
-    selector.inbox = true;
-  } else if (view === 'today') {
-    const end = new Date();
-    end.setHours(23, 59, 59, 999);
-    selector.due = { $lte: end.toISOString() };
-  }
-  const res = await db.find({ selector, limit: 500 });
-  return res.docs;
+// Load every task once; views are computed in-memory. Cheap for personal use,
+// avoids per-view index bookkeeping, and makes search/counts trivial.
+export async function getAllTasks() {
+  const res = await db.allDocs({
+    include_docs: true,
+    startkey: 'task:',
+    endkey: 'task:￰'
+  });
+  return res.rows.map((r) => r.doc);
 }
